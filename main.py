@@ -6,7 +6,7 @@ import datetime
 import argparse
 import gym_soccer
 from gym.wrappers import Monitor
-from agent import RandomAgent
+from agent import RandomAgent, PDQNAgent
 from utils import pad_action
 
 
@@ -34,6 +34,7 @@ def train(cfg):
     action = pad_action(act, act_param)
     rewards = []
     tot_reward = 0.
+    # todo : the std RL train mode && tenserboard plot
     for i in range(5000):
         next_state, reward, done, info = env.step(action)
         tot_reward += reward
