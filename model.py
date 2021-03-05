@@ -49,7 +49,7 @@ class ParamNet(nn.Module):
             for i in range(1, num_hl):
                 self.layers.append(nn.Linear(hidden_layers[i - 1], hidden_layers[i]))
             lastHiddenSize = hidden_layers[num_hl - 1]
-            self.layers.append(nn.Linear(lastHiddenSize, action_parameter_size))
+        self.layers.append(nn.Linear(lastHiddenSize, action_parameter_size))
 
     def forward(self, state):
         x = state
