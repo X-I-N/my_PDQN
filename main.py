@@ -22,6 +22,15 @@ def get_args():
     parser.add_argument('--train_eps', default=10000, type=int)
     parser.add_argument('--eval_eps', default=1000, type=int)
     parser.add_argument('--device', default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument('--epsilon_start', default=0.95, type=float)
+    parser.add_argument('--epsilon_decay', default=5000, type=int)
+    parser.add_argument('--epsilon_end', default=0.02, type=float)
+    parser.add_argument('batch_size', default=32, type=int)
+    parser.add_argument('--actor_lr', default=1e-3, type=float)
+    parser.add_argument('param_net_lr', default=1e-4, type=float)
+    parser.add_argument('--gamma', default=0.90, type=float)
+    parser.add_argument('--layer_actor', default=[256, 128, 64])
+    parser.add_argument('--layer_param', default=[256, 128, 64])
 
     config = parser.parse_args()
     return config
@@ -30,7 +39,12 @@ def get_args():
 def train(cfg):
     env = gym.make('SoccerScoreGoal-v0')
     env = Monitor(env, directory=os.path.join(cfg.save_dir), video_callable=False, write_upon_reset=False, force=True)
-    agent = RandomAgent(action_space=env.action_space, seed=cfg.seed)
+    agent = PDQNAgent(state_space=env.observation_space, action_space=env.action_space,
+                      epsilon_start=cfg.epsilon_start, epsilon_decay=cfg.epsilon_decay, epsilon_end=cfg.epsilon_end,
+                      batch_size=cfg.batch_size, device=cfg.device, gamma=cfg.gamma,
+                      actor_kwargs={"hidden_layers": cfg.layers_actor},
+                      param_net_kwargs={"hidden_layers": cfg.layers_param},
+                      )
 
     rewards = []
     moving_avg_rewards = []
@@ -38,18 +52,16 @@ def train(cfg):
     log_dir = os.path.split(os.path.abspath(__file__))[0] + "/logs/train/" + SEQUENCE
     writer = SummaryWriter(log_dir)
     for i_eps in range(1, 1 + cfg.train_eps):
-        info = {'status': 'NOT_SET'}
         state = env.reset()
         state = np.array(state, dtype=np.float32)
 
         episode_reward = 0.
-        transitions = []
         for i_step in range(cfg.max_steps):
             act, act_param, all_action_param = agent.choose_action(state)
             action = pad_action(act, act_param)
             next_state, reward, done, info = env.step(action)
             next_state = np.array(next_state, dtype=np.float32)
-            transitions.append(
+            agent.memory.push(
                 [state, np.concatenate(([act], all_action_param.data)).ravel(), reward, next_state, done])
             episode_reward += reward
             state = next_state
